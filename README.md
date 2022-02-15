@@ -1,6 +1,4 @@
 # crowdfunding
-pragma solidity >=0.5.0<0.9.0;
-
 contract CrowdFunding{
     mapping(address=>uint) public contributors;
     address public manager;
@@ -17,7 +15,7 @@ contract CrowdFunding{
         uint value;
         bool completed;
         uint noOfVoters;
-        mapping(address =>bool)Voters;
+        mapping(address =>bool) voters;
     }
 mapping(uint=>Request)public requests;
 uint public numRequests;
@@ -57,24 +55,24 @@ uint public numRequests;
         Request storage newRequest = requests[numRequests];
         numRequests++;
         newRequest.description=_description;
-        numRequest.recipient=_recipient;
-        numrequest.value=_value;
-        numRequest.completed=false;
-        noOfVoters.noOfVoters=0;
+        newRequest.recipient=_recipient;
+        newRequest.value=_value;
+        newRequest.completed=false;
+        newRequest.noOfVoters=0;
     }
-    function VoteRequest(uint _requestNo) public{
+    function voteRequest(uint _requestNo) public{
         require(contributors[msg.sender]>0,"You must be contributor");
-        Request stroage thisRequest = requests[_requestNo];
-        require(thisRequest.Voters[msg.sender]==false,"You have already voted");
+        Request storage thisRequest = requests[_requestNo];
+        require(thisRequest.voters[msg.sender]==false,"You have already voted");
         thisRequest.voters[msg.sender]=true;
         thisRequest.noOfVoters++;
     }
     function makePayment(uint _requestNo) public onlyManager{
         require(raisedAmount>=target);
-        Request storage thisRequest=request=requests[_requestNo];
+        Request storage thisRequest=requests[_requestNo];
         require(thisRequest.completed==false,"The request has been completed");
-        require(thisRequest.noOfVoters>noOfContributors/2,"Majority does not support");
-        thisRequest.recipient.transfer(thisRequest.value)
+        require(thisRequest.noOfVoters > noOfContributors/2,"Majority does not support");
+        thisRequest.recipient.transfer(thisRequest.value);
         thisRequest.completed=true;
     }
 }
