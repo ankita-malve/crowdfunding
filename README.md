@@ -1,4 +1,5 @@
 # crowdfunding
+pragma solidity >=0.5.0<0.9.0;
 contract CrowdFunding{
     mapping(address=>uint) public contributors;
     address public manager;
