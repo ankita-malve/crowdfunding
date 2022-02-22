@@ -1,81 +1,109 @@
 # crowdfunding
-//SPDX-License-Identifier: GPL- 3.0
-pragma solidity >=0.7.0<0.9.0;
+pragma solidity ^0.4.17;
 
-contract CrowdFunding{
-    mapping(address=>uint256) public contributors;
-    address public manager;
-    uint256 public minimumContribution;
-    uint256 public deadline;
-    uint256 public target;
-    uint256 public raisedAmount;
-    uint256 public noOfContributors;
+contract CampaignFactory {
+    address[] public deployedCampaigns;
 
-
-    struct Request{
-        string description;
-        address payable recipient;
-        uint256 value;
-        bool completed;
-        uint256 noOfVoters;
-        mapping(address =>bool) voters;
-    }
-mapping(uint256=>Request)public requests;
-uint256 public numRequests;
-
-    constructor(uint256 _target,uint256 _deadline){
-        target=_target;
-        deadline=block.timestamp+_deadline;
-        minimumContribution=100 wei;
-        manager=msg.sender;
+    function createCampaign(uint minimum,string name,string description,string image,uint target) public {
+        address newCampaign = new Campaign(minimum, msg.sender,name,description,image,target);
+        deployedCampaigns.push(newCampaign);
     }
 
-    function sendEth() public payable{
-        require(block.timestamp < deadline,"Deadline has passed");
-        require(msg.value >=minimumContribution,"Minimum Contribution is not met");
+    function getDeployedCampaigns() public view returns (address[]) {
+        return deployedCampaigns;
+    }
+}
 
-        if(contributors[msg.sender]==0){
-            noOfContributors++;
-        }
-        contributors[msg.sender]+=msg.value;
-        raisedAmount+=msg.value;
+
+contract Campaign {
+  struct Request {
+      string description;
+      uint value;
+      address recipient;
+      bool complete;
+      uint approvalCount;
+      mapping(address => bool) approvals;
+  }
+
+  Request[] public requests;
+  address public manager;
+  uint public minimunContribution;
+  string public CampaignName;
+  string public CampaignDescription;
+  string public imageUrl;
+  uint public targetToAchieve;
+  address[] public contributers;
+  mapping(address => bool) public approvers;
+  uint public approversCount;
+
+
+  modifier restricted() {
+      require(msg.sender == manager);
+      _;
+  }
+
+  function Campaign(uint minimun, address creator,string name,string description,string image,uint target) public {
+      manager = creator;
+      minimunContribution = minimun;
+      CampaignName=name;
+      CampaignDescription=description;
+      imageUrl=image;
+      targetToAchieve=target;
+  }
+
+  function contibute() public payable {
+      require(msg.value > minimunContribution );
+
+      contributers.push(msg.sender);
+      approvers[msg.sender] = true;
+      approversCount++;
+  }
+
+  function createRequest(string description, uint value, address recipient) public restricted {
+      Request memory newRequest = Request({
+         description: description,
+         value: value,
+         recipient: recipient,
+         complete: false,
+         approvalCount: 0
+      });
+
+      requests.push(newRequest);
+  }
+
+  function approveRequest(uint index) public {
+      require(approvers[msg.sender]);
+      require(!requests[index].approvals[msg.sender]);
+
+      requests[index].approvals[msg.sender] = true;
+      requests[index].approvalCount++;
+  }
+
+  function finalizeRequest(uint index) public restricted{
+      require(requests[index].approvalCount > (approversCount / 2));
+      require(!requests[index].complete);
+
+      requests[index].recipient.transfer(requests[index].value);
+      requests[index].complete = true;
+
+  }
+
+
+    function getSummary() public view returns (uint,uint,uint,uint,address,string,string,string,uint) {
+        return(
+            minimunContribution,
+            this.balance,
+            requests.length,
+            approversCount,
+            manager,
+            CampaignName,
+            CampaignDescription,
+            imageUrl,
+            targetToAchieve
+          );
     }
-    function getContractBalance() public view returns(uint256){
-        return address(this).balance;
-    }
-    function refund() public{
-        require(block.timestamp>deadline && raisedAmount<target,"You are not eligible for refund");
-        require(contributors[msg.sender]>0); 
-        address payable user =payable(msg.sender);
-        user.transfer(contributors[msg.sender]);
-        contributors[msg.sender]=0;
-    }
-    modifier onlyManager(){
-        require(msg.sender == manager,"Only manager can call this function");
-        _;
-    }
-    function createRequests(string memory _description, address payable _recipient, uint256 _value)public onlyManager{
-        Request storage newRequest = requests[numRequests];
-        numRequests++;
-        newRequest.description=_description;
-        newRequest.recipient=_recipient;
-        newRequest.value=_value;
-        newRequest.completed=false;
-        newRequest.noOfVoters=0;
-    }
-    function voteRequest(uint256 _requestNo) public{
-        require(contributors[msg.sender]>0,"You must be contributor");
-        Request storage thisRequest = requests[_requestNo];
-        require(thisRequest.voters[msg.sender]==false,"You have already voted");
-        thisRequest.voters[msg.sender]=true;
-        thisRequest.noOfVoters++;
-    }
-    function makePayment(uint256 _requestNo) public onlyManager{
-        require(raisedAmount>=target);
-        Request storage thisRequest=requests[_requestNo];
-        require(thisRequest.completed==false,"The request has been completed");
-        require(thisRequest.noOfVoters > noOfContributors/2,"Majority does not support");
-        thisRequest.recipient.transfer(thisRequest.value);
-        thisRequest.completed=true;
+
+    function getRequestsCount() public view returns (uint){
+        return requests.length;
     }
 }
